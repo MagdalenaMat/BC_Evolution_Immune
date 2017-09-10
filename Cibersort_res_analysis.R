@@ -27,8 +27,36 @@ Mono_ex = Mono_ex[, seq(3, length(Mono_ex), 2)]
 colnames(Mono_ex) = c("AVL_Mono","DCIS_Mono","EN_Mono","IDC_Mono","LN_Mono","MetECE_Mono","normal_Mono")
 
 Mono_ex[Mono_ex<=1] <- NA
+apply(Mono_ex, 2, function(x){sum(!is.na(x))})
+
+Mono_ex_DCIS = Mono_ex[!is.na(Mono_ex$DCIS_Mono),] 
 cor(Mono_ex,use="pairwise.complete.obs",method="pearson") # can't use spearman here
 al3_mono = Mono_ex[rowSums(!is.na(Mono_ex)) >= 3,]
+
+###########
+#plot gene values in different stages 
+###########
+
+library(reshape2)
+library(dplyr)
+to_reshape = data.frame(gene.names = rownames(al3_mono), al3_mono)
+to_reshape = to_reshape[,c(1,8,6,4,3,5,2,7)]
+change = mutate(to_reshape, EN_DCIS = ((to_reshape$EN_Mono/to_reshape$DCIS_Mono)-1)*100, 
+                DCIS_IDC = ((to_reshape$IDC_Mono/to_reshape$DCIS_Mono)-1)*100)
+
+long_Mono = melt(to_reshape, id.vars = "gene.names")
+p <- plot_ly(long_Mono, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>%  layout(showlegend = FALSE)
+
+
+EN_subset = to_reshape[!is.na(to_reshape$EN_Mono),c(1,4,5,6)]
+long_EN = melt(EN_subset, id.vars = "gene.names")
+
+p <- plot_ly(long_EN, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>%  layout(showlegend = FALSE)  
+
+
+
 all = cor(al3_mono,use="pairwise.complete.obs",method="pearson")
 all = data.frame(all)
 
