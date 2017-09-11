@@ -27,7 +27,8 @@ Mono_ex = Mono_ex[, seq(3, length(Mono_ex), 2)]
 colnames(Mono_ex) = c("AVL_Mono","DCIS_Mono","EN_Mono","IDC_Mono","LN_Mono","MetECE_Mono","normal_Mono")
 
 Mono_ex[Mono_ex<=1] <- NA
-apply(Mono_ex, 2, function(x){sum(!is.na(x))})
+predicted_genes_Monocytes = apply(Mono_ex, 2, function(x){sum(!is.na(x))})
+write.table(predicted_genes_Monocytes, "predicted_genes_Monocytes_in_stages.txt", col.names = FALSE, quote = FALSE)
 
 Mono_ex_DCIS = Mono_ex[!is.na(Mono_ex$DCIS_Mono),] 
 cor(Mono_ex,use="pairwise.complete.obs",method="pearson") # can't use spearman here
@@ -41,8 +42,33 @@ library(reshape2)
 library(dplyr)
 to_reshape = data.frame(gene.names = rownames(al3_mono), al3_mono)
 to_reshape = to_reshape[,c(1,8,6,4,3,5,2,7)]
-change = mutate(to_reshape, EN_DCIS = ((to_reshape$EN_Mono/to_reshape$DCIS_Mono)-1)*100, 
-                DCIS_IDC = ((to_reshape$IDC_Mono/to_reshape$DCIS_Mono)-1)*100)
+change = mutate(to_reshape, EN_DCIS = log2(to_reshape$DCIS_Mono/to_reshape$EN_Mono), 
+                DCIS_IDC = log2(to_reshape$IDC_Mono/to_reshape$DCIS_Mono))
+
+change1 = change[order(change$EN_DCIS, decreasing = TRUE),c(1,9,10)]
+To_GOEA_up_EN_DCIS = change1$gene.names[which(change1$EN_DCIS >= 0.5)]
+To_GOEA_down_EN_DCIS = change1$gene.names[which(change1$EN_DCIS <= -1)]
+
+change2 = change[order(change$DCIS_IDC, decreasing = TRUE),c(1,9,10)]
+To_GOEA_up_DCIS_IDC = change2$gene.names[which(change2$DCIS_IDC >= 1)]
+To_GOEA_down_DCIS_IDC = change2$gene.names[which(change2$DCIS_IDC <= -0.8)]
+
+scaled_up_EN_DCIS = to_reshape[to_reshape$gene.names %in% To_GOEA_up_EN_DCIS,c(1,4,5)]
+scaled_up_EN_DCIS = data.frame(gene.names = scaled_up_EN_DCIS[,1], scaled_up_EN_DCIS[,c(2,3)]/scaled_up_EN_DCIS[,2])
+long_scaled_up_EN_DCIS = melt(scaled_up_EN_DCIS,id.vars = "gene.names")
+p <- plot_ly(long_scaled_up_EN_DCIS, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>% add_annotations(long_scaled_up_EN_DCIS$gene.names) %>% layout(showlegend = FALSE)  
+
+
+scaled_down_EN_DCIS
+
+# EN_DCIS_genes = change1$gene.names[c(1:100,1313:1412)]
+# to_heatmap = change[change$gene.names %in% EN_DCIS_genes,c(1,4,5,9)]
+# to_heatmap2 = to_heatmap[order(to_heatmap$EN_DCIS, decreasing = TRUE),]
+# rownames(to_heatmap2) = to_heatmap2[,1]
+# to_heatmap2 = to_heatmap2[,-1]
+# library(heatmaply)
+# heatmaply(log2(to_heatmap2[,c(1,2)]+1), dendrogram = "row")
 
 long_Mono = melt(to_reshape, id.vars = "gene.names")
 p <- plot_ly(long_Mono, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
@@ -54,6 +80,44 @@ long_EN = melt(EN_subset, id.vars = "gene.names")
 
 p <- plot_ly(long_EN, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
   add_lines() %>%  layout(showlegend = FALSE)  
+
+up_EN_DCIS_to_reshape = to_reshape[to_reshape$gene.names %in% To_GOEA,c(1,4,5,6)]
+up_EN_DCIS_to_reshape1 = mutate(up_EN_DCIS_to_reshape, difference = up_EN_DCIS_to_reshape$IDC_Mono - up_EN_DCIS_to_reshape$EN_Mono)
+up_EN_DCIS_to_reshape1 = up_EN_DCIS_to_reshape1[order(up_EN_DCIS_to_reshape1$difference, decreasing = TRUE),]
+up_EN_DCIS_to_reshape1 = up_EN_DCIS_to_reshape1[1:5,c(1:4)]
+long_EN_DCIS_up = melt(up_EN_DCIS_to_reshape1, id.vars = "gene.names")
+p <- plot_ly(long_EN_DCIS_up, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>% add_annotations(long_EN_DCIS_up$gene.names) %>% layout(showlegend = FALSE)  
+
+
+down_EN_DCIS_to_reshape = to_reshape[to_reshape$gene.names %in% To_GOEA_down,c(1,4,5,6)]
+down_EN_DCIS_to_reshape1 = mutate(down_EN_DCIS_to_reshape, difference = down_EN_DCIS_to_reshape$IDC_Mono - down_EN_DCIS_to_reshape$EN_Mono)
+down_EN_DCIS_to_reshape1 = down_EN_DCIS_to_reshape1[order(down_EN_DCIS_to_reshape1$difference, decreasing = TRUE),]
+down_EN_DCIS_to_reshape1 = down_EN_DCIS_to_reshape1[1:20,c(1:4)]
+long_EN_DCIS_down = melt(down_EN_DCIS_to_reshape1, id.vars = "gene.names")
+p <- plot_ly(long_EN_DCIS_down, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>% add_annotations(long_EN_DCIS_down$gene.names) %>% layout(showlegend = FALSE)  
+
+
+up_DCIS_IDC_to_reshape = to_reshape[to_reshape$gene.names %in% To_GOEA_up,c(1,4,5,6)]
+up_DCIS_IDC_to_reshape1 = mutate(up_DCIS_IDC_to_reshape, difference = up_DCIS_IDC_to_reshape$IDC_Mono - up_DCIS_IDC_to_reshape$EN_Mono)
+up_DCIS_IDC_to_reshape1 = up_DCIS_IDC_to_reshape1[order(up_DCIS_IDC_to_reshape1$difference, decreasing = TRUE),]
+up_DCIS_IDC_to_reshape1 = up_DCIS_IDC_to_reshape1[1:5,c(1:4)]
+long_DCIS_IDC_up = melt(up_DCIS_IDC_to_reshape1, id.vars = "gene.names")
+p <- plot_ly(long_DCIS_IDC_up, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>%  add_annotations(long_DCIS_IDC_up$gene.names) %>% layout(showlegend = FALSE)  
+
+
+down_DCIS_IDC_to_reshape = to_reshape[to_reshape$gene.names %in% To_GOEA_down,c(1,4,5,6)]
+down_DCIS_IDC_to_reshape1 = mutate(down_DCIS_IDC_to_reshape, difference = down_DCIS_IDC_to_reshape$IDC_Mono - down_DCIS_IDC_to_reshape$EN_Mono)
+down_DCIS_IDC_to_reshape1 = down_DCIS_IDC_to_reshape1[order(down_DCIS_IDC_to_reshape1$difference, decreasing = TRUE),]
+down_DCIS_IDC_to_reshape1 = down_DCIS_IDC_to_reshape1[1:5,c(1:4)]
+long_DCIS_IDC_down = melt(down_DCIS_IDC_to_reshape1, id.vars = "gene.names")
+p <- plot_ly(long_DCIS_IDC_down, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>% add_annotations(long_DCIS_IDC_down$gene.names) %>% layout(showlegend = FALSE)  
+
+
+
 
 
 
