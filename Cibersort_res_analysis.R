@@ -22,7 +22,7 @@ for (i in files){
   namesGEP = c(namesGEP, nam)
 }
 
-#put all files in the lyst
+#put all files in the list
 filteredGEP = list()
 for (i in 1: length(files)){
   r = read.table(files[i], sep = "\t", header = TRUE)
@@ -61,24 +61,11 @@ colnames(Mono_ex) = c("AVL_Mono","DCIS_Mono","EN_Mono","IDC_Mono","LN_Mono","Met
 
 Mono_ex[Mono_ex<=1] <- NA
 predicted_genes_Monocytes = apply(Mono_ex, 2, function(x){sum(!is.na(x))})
-write.table(predicted_genes_Monocytes, "predicted_genes_Monocytes_in_stages.txt", col.names = FALSE, quote = FALSE)
+#write.table(predicted_genes_Monocytes, "predicted_genes_Monocytes_in_stages.txt", col.names = FALSE, quote = FALSE)
 
 #Mono_ex_DCIS = Mono_ex[!is.na(Mono_ex$DCIS_Mono),] 
 #cor(Mono_ex,use="pairwise.complete.obs",method="pearson") # can't use spearman here
 al2_mono = Mono_ex[rowSums(!is.na(Mono_ex)) >= 2,]
-
-
-#############
-#heatmaps
-#############
-
-EN_DCIS_genes = change1$gene.names[c(1:100,1313:1412)]
-to_heatmap = change[change$gene.names %in% EN_DCIS_genes,c(1,4,5,9)]
-to_heatmap2 = to_heatmap[order(to_heatmap$EN_DCIS, decreasing = TRUE),]
-rownames(to_heatmap2) = to_heatmap2[,1]
-to_heatmap2 = to_heatmap2[,-1]
-library(heatmaply)
-heatmaply(log2(to_heatmap2[,c(1,2)]+1), dendrogram = "row")
 
 ##########
 #plot gene values in different stages 
@@ -86,6 +73,7 @@ heatmaply(log2(to_heatmap2[,c(1,2)]+1), dendrogram = "row")
 library(plotly)
 library(reshape2)
 library(dplyr)
+library(ggplot2)
 to_reshape = data.frame(gene.names = rownames(al2_mono), al2_mono)
 to_reshape = to_reshape[,c(1,8,6,4,3,5,2,7)]
 
@@ -93,17 +81,59 @@ to_reshape = to_reshape[,c(1,8,6,4,3,5,2,7)]
 change = mutate(to_reshape, EN_DCIS = log2(to_reshape$DCIS_Mono/to_reshape$EN_Mono), 
                 DCIS_IDC = log2(to_reshape$IDC_Mono/to_reshape$DCIS_Mono),EN_IDC = log2(to_reshape$IDC_Mono/to_reshape$EN_Mono))
 
-ImGenes_HLA_CTSB = c("CTSB","HLA.DMA","HLA.DPB1","HLA.DRB1","HLA.DQB1")
-ImGenes_rest = c("TGFB1","TGFB2","CSF1R","MUC4","TNFSF12","TNFRSF1A","TRADD","APOE",
-                 "CD68","CD163","CD47","CD14","CD80","CD86")
-ImGenes_NFkB_IFN = c("NFKB1A","MYD88","TLR3","IFNAR1","IFNAR2","IFNGR1","IFNGR2","STAT1")
-Immuno = change[change$gene.names %in% ImGenes_NFkB_IFN,]
-Immuno = Immuno[,c(1,4,5,6)]
-long_Imm = melt(Immuno, id.vars = "gene.names")
-p <- plot_ly(long_Imm, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
-  add_lines() %>% add_annotations(long_Imm$gene.names) %>% layout(showlegend = FALSE)  
+ImGenes = list()
+ImGenes[["HLA_CTSB"]] = c("CTSB","HLA.DMA","HLA.DPB1","HLA.DRB1","HLA.DQB1")
+ImGenes[["TGF"]] = c("TGFB2","MUC4")
+ImGenes[["TNF"]] = c("TNFSF12","TNFRSF1A","TRADD")
+ImGenes[["CD"]] = c("CD163","CD47","CD14","CD80","APOE", "CSF1R")
+ImGenes[["NFkB_IFN"]] = c("NFKBIA","MYD88","TLR3","IFNAR1","IFNAR2","IFNGR1","IFNGR2","STAT1")
+genes = c("CD","HLA_CTSB", "NFkB_IFN", "TGF", "TNF")  
+for(i in genes){
+  Immuno = change[change$gene.names %in% ImGenes[[i]],]
+  Immuno = Immuno[,c(1,4,6)]
+  Immuno$gene.names = as.factor(as.character(Immuno$gene.names))
+  long_Imm = melt(Immuno, id.vars = "gene.names")
+  #print(ggplot(long_Imm,aes(x = variable, y = value, group = gene.names, color = gene.names)) + geom_line() + theme_bw())
+  p <- plot_ly(long_Imm, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+    add_lines() %>% add_annotations(long_Imm$gene.names) %>% layout(showlegend = FALSE)  
+  print(p) 
+}
 
 
+#select genes with biggest FC difference between EN and IDC
+change1 = change[order(change$EN_IDC, decreasing = TRUE),c(1,11)]
+up_EN_IDC = change1$gene.names[which(change1$EN_IDC >= 0.5)]
+down_EN_IDC = change1$gene.names[which(change1$EN_IDC <= -0.5)]
+
+scaled = change[change$gene.names %in% down_EN_IDC,c(1,4,6)]
+scaled$gene.names = as.factor(as.character(scaled$gene.names))
+scaled = data.frame(gene.names = scaled[,1], scaled[,c(2,3)]/scaled[,3])
+long_scaled = melt(scaled,id.vars = "gene.names")
+p <- plot_ly(long_scaled, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>% layout(showlegend = FALSE, margin = list(500,50,50,50))  
+p
+
+
+#############
+#heatmaps
+#############
+library(heatmaply)
+library(pheatmap)
+which(change1$gene.names == "VGLL1")
+EN_IDC_genes = change1$gene.names[c(1:100,1135:1234)]
+to_heatmap = change[change$gene.names %in% EN_IDC_genes,c(1,4,6)]
+Im_genes_to_hm =unlist(ImGenes)
+Im_genes_to_hm = Im_genes_to_hm[!Im_genes_to_hm %in% c("TLR3","MUC4","TGFB2")]
+to_heatmap_IMM = change[change$gene.names %in% Im_genes_to_hm, c(1,4,6)]
+rownames(to_heatmap_IMM) = to_heatmap_IMM[,1]
+to_heatmap_IMM = to_heatmap_IMM[,-1]
+
+heatmaply(log2(to_heatmap[,c(1,2)]+1), dendrogram = "row",showticklabels = c(T,F))
+heatmaply(log2(to_heatmap_IMM[,c(1,2)]+1), dendrogram = "row")
+
+print(pheatmap(to_heatmap_IMM,
+               cluster_rows=TRUE, 
+               cluster_cols=FALSE))
 
 #select genes with biggest FC difference between EN and DCIS
 change1 = change[order(change$EN_DCIS, decreasing = TRUE),c(1,9,10)]
@@ -115,15 +145,6 @@ change2 = change[order(change$DCIS_IDC, decreasing = TRUE),c(1,9,10)]
 To_GOEA_up_DCIS_IDC = change2$gene.names[which(change2$DCIS_IDC >= 1)]
 To_GOEA_down_DCIS_IDC = change2$gene.names[which(change2$DCIS_IDC <= -0.8)]
 
-scaled_up_EN_DCIS = to_reshape[to_reshape$gene.names %in% To_GOEA_up_EN_DCIS,c(1,4,5)]
-scaled_up_EN_DCIS = data.frame(gene.names = scaled_up_EN_DCIS[,1], scaled_up_EN_DCIS[,c(2,3)]/scaled_up_EN_DCIS[,2])
-scaled_up_EN_DCIS = scaled_up_EN_DCIS[scaled_up_EN_DCIS$,]
-long_scaled_up_EN_DCIS = melt(scaled_up_EN_DCIS,id.vars = "gene.names")
-p <- plot_ly(long_scaled_up_EN_DCIS, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
-  add_lines() %>% add_annotations(long_scaled_up_EN_DCIS$gene.names) %>% layout(showlegend = FALSE)  
-
-
-scaled_down_EN_DCIS
 
 
 
@@ -212,16 +233,16 @@ heatmaply(log2(viral_res[,1:3]), dendrogram = "none",
 trimmed1 = trimmed[complete.cases(trimmed[,2]),]
 heatmaply(log2(trimmed1+1))
 
-#######
+###########################################################################################################################################
 path = "/home/magda/Desktop/cibersortX/run2/GEP"
 setwd(path)
 files <- list.files(path=path)
 
 #extract genes in monocyte signature common for all samples 
-LM22genes_ex = data.frame(matrix(NA, nrow = 2696, ncol = 1))
+LM22genes_ex = data.frame(matrix(NA, nrow = 5372, ncol = 1))
 for (i in 1: length(files)){
   r = read.csv(files[i], sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "")
-  stage = r[r[,1] %in% rownames(al3_mono),] 
+  stage = r[r[,1] %in% rownames(al2_mono),] 
   colnames(stage) = paste(colnames(stage),rep(files[i],10))
   LM22genes_ex = cbind(LM22genes_ex,stage)
 }
@@ -234,7 +255,7 @@ LM22genes_ex1[LM22genes_ex1 <=0] = NA # strong assumption that 0's are not detec
 
 library(softImpute)
 
-soft_imputed = soft_imputed_ex$u %*% diag(soft_imputed_ex$d) %*% t(soft_imputed_ex$v)
+#soft_imputed = soft_imputed_ex$u %*% diag(soft_imputed_ex$d) %*% t(soft_imputed_ex$v)
 
 soft_imputed_ex = softImpute(as.matrix(LM22genes_ex1),rank.max=2,maxit=1000,thresh = 1e-5)
 plot(soft_imputed_ex$u)
@@ -245,7 +266,7 @@ soft_imputed = soft_imputed_ex$u %*% diag(soft_imputed_ex$d) %*% t(soft_imputed_
 sub_to_SI = list()
 for (i in 1: length(files)){
   r = read.csv(files[i], sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "")
-  stage = r[r[,1] %in% rownames(al3_mono),] 
+  stage = r[r[,1] %in% rownames(al2_mono),] 
   colnames(stage) = paste(colnames(stage),rep(files[i],10))
   sub_to_SI[[i]] = stage
 }
@@ -256,10 +277,34 @@ for(i in 1: length(files)){
   sub_to_SI[[i]] = sub_to_SI[[i]][,-1]
 }
 
+for(i in 1: length(files)){
+  sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) - colMeans(sub_to_SI[[i]],na.rm = TRUE))
+}
+# for(i in 1: length(files)){
+#   sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) / apply(sub_to_SI[[i]],2,sd,na.rm = TRUE))
+# }
+
 sI_expr = list()
 for(i in 1: length(files)){
-  sI_expr[[i]] = softImpute(as.matrix(LM22genes_ex1),rank.max=2,maxit=1000,thresh = 1e-5)
+  sI_expr[[i]] = softImpute(as.matrix(sub_to_SI[[i]]),rank.max=2,maxit=1000,thresh = 1e-5)
 }
+
+
+v_list = list()
+for(i in 1: length(sI_expr)){
+  v = data.frame(sI_expr[[i]]$v)
+  colnames(v) = c("dim1","dim2")
+  rownames(v) = colnames(sub_to_SI[[i]])
+  v_list[[i]] = v
+}
+
+p = plot_ly()
+for(i in 1: length(v_list)){
+  p = p %>% add_trace(data= v_list[[i]], x = ~dim1, y = ~dim2,  text = rownames(v_list[[i]]), type="scatter", mode="markers")
+}
+p
+
+
 
 plot(sI_expr[[4]]$u)
 points(sI_expr[[5]]$u, col = 2)
@@ -276,3 +321,13 @@ rownames(IDC) = rownames(sub_to_SI[[5]])
 plot_ly() %>% 
   add_trace(data=DCIS, x = ~dim1, y = ~dim2,  text = rownames(DCIS), type="scatter", mode="markers") %>% 
   add_trace(data=IDC, x = ~dim1, y = ~dim2,  text = rownames(IDC), type="scatter", mode = "markers")
+
+DCIS_cells = data.frame(sI_expr[[4]]$v)
+colnames(DCIS_cells) = c("dim1","dim2")
+rownames(DCIS_cells) = colnames(sub_to_SI[[4]])
+IDC_cells = data.frame(sI_expr[[5]]$v)
+colnames(IDC_cells) = c("dim1","dim2")
+rownames(IDC_cells) = colnames(sub_to_SI[[5]])
+plot_ly() %>% 
+  add_trace(data=DCIS_cells, x = ~dim1, y = ~dim2,  text = rownames(DCIS_cells), type="scatter", mode="markers") %>% 
+  add_trace(data=IDC_cells, x = ~dim1, y = ~dim2,  text = rownames(IDC_cells), type="scatter", mode = "markers")
