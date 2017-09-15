@@ -61,11 +61,15 @@ colnames(Mono_ex) = c("AVL_Mono","DCIS_Mono","EN_Mono","IDC_Mono","LN_Mono","Met
 
 Mono_ex[Mono_ex<=1] <- NA
 predicted_genes_Monocytes = apply(Mono_ex, 2, function(x){sum(!is.na(x))})
+
 #write.table(predicted_genes_Monocytes, "predicted_genes_Monocytes_in_stages.txt", col.names = FALSE, quote = FALSE)
 
 #Mono_ex_DCIS = Mono_ex[!is.na(Mono_ex$DCIS_Mono),] 
 #cor(Mono_ex,use="pairwise.complete.obs",method="pearson") # can't use spearman here
 al2_mono = Mono_ex[rowSums(!is.na(Mono_ex)) >= 2,]
+al3_mono = Mono_ex[rowSums(!is.na(Mono_ex)) >= 3,]
+library(heatmaply)
+heatmaply_na(al3_mono, showticklabels = c(T,F))
 
 ##########
 #plot gene values in different stages 
@@ -87,7 +91,8 @@ ImGenes[["TGF"]] = c("TGFB2","MUC4")
 ImGenes[["TNF"]] = c("TNFSF12","TNFRSF1A","TRADD")
 ImGenes[["CD"]] = c("CD163","CD47","CD14","CD80","APOE", "CSF1R")
 ImGenes[["NFkB_IFN"]] = c("NFKBIA","MYD88","TLR3","IFNAR1","IFNAR2","IFNGR1","IFNGR2","STAT1")
-genes = c("CD","HLA_CTSB", "NFkB_IFN", "TGF", "TNF")  
+ImGenes[["B2M"]] = c("B2M")
+genes = c("CD","HLA_CTSB", "NFkB_IFN", "TGF", "TNF","B2M")  
 for(i in genes){
   Immuno = change[change$gene.names %in% ImGenes[[i]],]
   Immuno = Immuno[,c(1,4,6)]
@@ -105,11 +110,28 @@ change1 = change[order(change$EN_IDC, decreasing = TRUE),c(1,11)]
 up_EN_IDC = change1$gene.names[which(change1$EN_IDC >= 0.5)]
 down_EN_IDC = change1$gene.names[which(change1$EN_IDC <= -0.5)]
 
+scaled = change[change$gene.names %in% up_EN_IDC,c(1,4,6)]
+scaled$gene.names = as.factor(as.character(scaled$gene.names))
+scaled = data.frame(gene.names = scaled[,1], scaled[,c(2,3)]/scaled[,2])
+long_scaled = melt(scaled,id.vars = "gene.names")
+p <- plot_ly(long_scaled, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>% layout(showlegend = FALSE, margin = list(500,50,50,50))  
+p
+
 scaled = change[change$gene.names %in% down_EN_IDC,c(1,4,6)]
 scaled$gene.names = as.factor(as.character(scaled$gene.names))
 scaled = data.frame(gene.names = scaled[,1], scaled[,c(2,3)]/scaled[,3])
 long_scaled = melt(scaled,id.vars = "gene.names")
 p <- plot_ly(long_scaled, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
+  add_lines() %>% layout(showlegend = FALSE, margin = list(500,50,50,50))  
+p
+
+add_annotations(long_EN_DCIS_up$gene.names) %>%
+
+not_scaled = change[change$gene.names %in% down_EN_IDC,c(1,4,5,6)]
+not_scaled$gene.names = as.factor(as.character(not_scaled$gene.names))
+long_not_scaled = melt(not_scaled, id.vars = "gene.names")
+p <- plot_ly(long_not_scaled, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
   add_lines() %>% layout(showlegend = FALSE, margin = list(500,50,50,50))  
 p
 
@@ -122,6 +144,10 @@ library(pheatmap)
 which(change1$gene.names == "VGLL1")
 EN_IDC_genes = change1$gene.names[c(1:100,1135:1234)]
 to_heatmap = change[change$gene.names %in% EN_IDC_genes,c(1,4,6)]
+to_heatmap = to_heatmap[order(to_heatmap$IDC_Mono, decreasing = TRUE),]
+rownames(to_heatmap) = to_heatmap$gene.names
+to_heatmap = to_heatmap[,-1]
+heatmaply(log2(to_heatmap+1), dendrogram = "none",showticklabels = c(T,F))
 Im_genes_to_hm =unlist(ImGenes)
 Im_genes_to_hm = Im_genes_to_hm[!Im_genes_to_hm %in% c("TLR3","MUC4","TGFB2")]
 to_heatmap_IMM = change[change$gene.names %in% Im_genes_to_hm, c(1,4,6)]
@@ -239,28 +265,28 @@ setwd(path)
 files <- list.files(path=path)
 
 #extract genes in monocyte signature common for all samples 
-LM22genes_ex = data.frame(matrix(NA, nrow = 5372, ncol = 1))
-for (i in 1: length(files)){
-  r = read.csv(files[i], sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "")
-  stage = r[r[,1] %in% rownames(al2_mono),] 
-  colnames(stage) = paste(colnames(stage),rep(files[i],10))
-  LM22genes_ex = cbind(LM22genes_ex,stage)
-}
-
-all(as.character(LM22genes_ex[,2])==as.character(LM22genes_ex[,12]))
-rownames(LM22genes_ex) = as.character(LM22genes_ex[,2])
-LM22genes_ex1 = LM22genes_ex[, -c(1,seq(2, length(LM22genes_ex), 10))]
-
-LM22genes_ex1[LM22genes_ex1 <=0] = NA # strong assumption that 0's are not detected TODO
+# LM22genes_ex = data.frame(matrix(NA, nrow = 5372, ncol = 1))
+# for (i in 1: length(files)){
+#   r = read.csv(files[i], sep = "\t", header = TRUE, stringsAsFactors = FALSE, quote = "")
+#   stage = r[r[,1] %in% rownames(al2_mono),] 
+#   colnames(stage) = paste(colnames(stage),rep(files[i],10))
+#   LM22genes_ex = cbind(LM22genes_ex,stage)
+# }
+# 
+# all(as.character(LM22genes_ex[,2])==as.character(LM22genes_ex[,12]))
+# rownames(LM22genes_ex) = as.character(LM22genes_ex[,2])
+# LM22genes_ex1 = LM22genes_ex[, -c(1,seq(2, length(LM22genes_ex), 10))]
+# 
+# LM22genes_ex1[LM22genes_ex1 <=0] = NA # strong assumption that 0's are not detected TODO
 
 library(softImpute)
 
 #soft_imputed = soft_imputed_ex$u %*% diag(soft_imputed_ex$d) %*% t(soft_imputed_ex$v)
 
-soft_imputed_ex = softImpute(as.matrix(LM22genes_ex1),rank.max=2,maxit=1000,thresh = 1e-5)
-plot(soft_imputed_ex$u)
-plot(soft_imputed_ex$v)
-soft_imputed = soft_imputed_ex$u %*% diag(soft_imputed_ex$d) %*% t(soft_imputed_ex$v)
+# soft_imputed_ex = softImpute(as.matrix(LM22genes_ex1),rank.max=2,maxit=1000,thresh = 1e-5)
+# plot(soft_imputed_ex$u)
+# plot(soft_imputed_ex$v)
+# soft_imputed = soft_imputed_ex$u %*% diag(soft_imputed_ex$d) %*% t(soft_imputed_ex$v)
 
 ############
 sub_to_SI = list()
@@ -280,9 +306,9 @@ for(i in 1: length(files)){
 for(i in 1: length(files)){
   sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) - colMeans(sub_to_SI[[i]],na.rm = TRUE))
 }
-# for(i in 1: length(files)){
-#   sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) / apply(sub_to_SI[[i]],2,sd,na.rm = TRUE))
-# }
+for(i in 1: length(files)){
+  sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) / apply(sub_to_SI[[i]],2,sd,na.rm = TRUE))
+}
 
 sI_expr = list()
 for(i in 1: length(files)){
@@ -298,9 +324,25 @@ for(i in 1: length(sI_expr)){
   v_list[[i]] = v
 }
 
+
+sI_Mono = data.frame()
+for(i in 1: length(v_list)){
+  mon = v_list[[i]][5,]
+  sI_Mono = rbind(sI_Mono,mon)
+}
+rownames(sI_Mono) = c("LN","normal","EN","DCIS","IDC","AVL","metECE")
+
+plot_ly(data = sI_Mono,  x = ~dim1, y = ~dim2,  
+        text = rownames(sI_Mono), type="scatter", mode="markers") %>%
+  add_annotations(rownames(sI_Mono)) %>%
+  layout(title = "normalized")
+
+names_stages = c("LN","normal","EN","DCIS","IDC","AVL","metECE")
 p = plot_ly()
 for(i in 1: length(v_list)){
-  p = p %>% add_trace(data= v_list[[i]], x = ~dim1, y = ~dim2,  text = rownames(v_list[[i]]), type="scatter", mode="markers")
+  p = p %>% add_trace(data= v_list[[i]], x = ~dim1, y = ~dim2, name = names_stages[i],
+                      text = rownames(v_list[[i]]), type="scatter", mode="markers") %>%
+    layout(title = "normalized")
 }
 p
 
@@ -331,3 +373,45 @@ rownames(IDC_cells) = colnames(sub_to_SI[[5]])
 plot_ly() %>% 
   add_trace(data=DCIS_cells, x = ~dim1, y = ~dim2,  text = rownames(DCIS_cells), type="scatter", mode="markers") %>% 
   add_trace(data=IDC_cells, x = ~dim1, y = ~dim2,  text = rownames(IDC_cells), type="scatter", mode = "markers")
+
+####################################
+normal = read.table("/home/magda/Desktop/cibersortX/bulk_normal_unames.txt", sep = "\t", header = TRUE)
+EN = read.table("/home/magda/Desktop/cibersortX/bulk_EN_unames.txt", sep = "\t", header = TRUE)
+DCIS = read.table("/home/magda/Desktop/cibersortX/bulk_DCIS_unames.txt", sep = "\t", header = TRUE)
+IDC = read.table("/home/magda/Desktop/cibersortX/bulk_IDC_unames.txt", sep = "\t", header = TRUE)
+
+Im_genes = c("CD14", "CD163","HLA.DMA","HLA.DPB1","HLA.DRB1","HLA.DQB1","NFKBIA",
+             "TNFSF12","TNFRSF1A","TRADD","CD80","APOE", "CSF1R","CD47","TGFB2","MYD88","TLR3","IFNAR1","IFNAR2","IFNGR1","IFNGR2","STAT1")
+
+stages = list(normal,EN,DCIS,IDC)
+names(stages) = c("normal","EN","DCIS","IDC")
+for(i in 1:length(stages)){
+  rownames(stages[[i]])= stages[[i]][,1]
+  stages[[i]]= stages[[i]][rownames(stages[[i]]) %in% Im_genes,-1]
+}
+
+gene_names = rownames(stages[[1]])
+
+res = data.frame(gene=c(),stage=c(),value=c())
+for(i in 1:length(gene_names)){
+  for(j in 1:length(stages)){
+    new.row = data.frame(gene=gene_names[i],
+                         stage=names(stages)[j],
+                         value=t(stages[[j]])[,i])
+    res = rbind(res, new.row)
+  }
+}
+
+res2 = data.frame()
+for(i in 1:length(stages)){
+  nstag = data.frame(t(stages[[i]]), stage = names(stages)[i])
+  res2 = rbind(res2,nstag)
+}
+
+
+library(ggplot2)
+library(ggpubr)
+for(i in colnames(res2)[1:18]){
+  print(ggboxplot(res2, x = "stage", y= i, color = "stage", add = "jitter", outlier.colour = NA))
+}
+
