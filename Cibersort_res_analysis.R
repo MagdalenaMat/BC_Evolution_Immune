@@ -57,7 +57,7 @@ for (i in namesGEP){
 all(as.character(Mono_ex[,10])==as.character(Mono_ex[,4]))
 rownames(Mono_ex) = as.character(Mono_ex[,2])
 Mono_ex = Mono_ex[, seq(3, length(Mono_ex), 2)]
-colnames(Mono_ex) = c("AVL_Mono","DCIS_Mono","EN_Mono","IDC_Mono","LN_Mono","MetECE_Mono","normal_Mono")
+colnames(Mono_ex) = c("AVL","DCIS","EN","IDC","LN","MetECE","normal")
 
 Mono_ex[Mono_ex<=1] <- NA
 predicted_genes_Monocytes = apply(Mono_ex, 2, function(x){sum(!is.na(x))})
@@ -82,26 +82,52 @@ to_reshape = data.frame(gene.names = rownames(al2_mono), al2_mono)
 to_reshape = to_reshape[,c(1,8,6,4,3,5,2,7)]
 
 #compute log2 Fold Changes
-change = mutate(to_reshape, EN_DCIS = log2(to_reshape$DCIS_Mono/to_reshape$EN_Mono), 
-                DCIS_IDC = log2(to_reshape$IDC_Mono/to_reshape$DCIS_Mono),EN_IDC = log2(to_reshape$IDC_Mono/to_reshape$EN_Mono))
+change = mutate(to_reshape, EN_DCIS = log2(to_reshape$DCIS/to_reshape$EN), 
+                DCIS_IDC = log2(to_reshape$IDC/to_reshape$DCIS),
+                EN_IDC = log2(to_reshape$IDC/to_reshape$EN))
 
 ImGenes = list()
-ImGenes[["HLA_CTSB"]] = c("CTSB","HLA.DMA","HLA.DPB1","HLA.DRB1","HLA.DQB1")
-ImGenes[["TGF"]] = c("TGFB2","MUC4")
+ImGenes[["HLA"]] = c("HLA.DMA","HLA.DPB1","HLA.DRB1","HLA.DQB1")
 ImGenes[["TNF"]] = c("TNFSF12","TNFRSF1A","TRADD")
-ImGenes[["CD"]] = c("CD163","CD47","CD14","CD80","APOE", "CSF1R")
-ImGenes[["NFkB_IFN"]] = c("NFKBIA","MYD88","TLR3","IFNAR1","IFNAR2","IFNGR1","IFNGR2","STAT1")
-ImGenes[["B2M"]] = c("B2M")
-genes = c("CD","HLA_CTSB", "NFkB_IFN", "TGF", "TNF","B2M")  
+ImGenes[["NFkB"]] = c("NFKBIA","MYD88")
+#ImGenes[["B2M"]] = c("B2M")
+ImGenes[["CD"]] = c("CD14","CD163")
+ImGenes[["IFN"]] = c("IFNGR1","IFNGR2","NFKBIA")
+ImGenes[["selected"]] = c("CD14", "CD163","NFKBIA")
+genes = c("CD","HLA","IFN","TNF","NFkB", "selected")  
+genes = c("CD", "HLA","IFN", "selected")
+# f2 = list(
+#   size = 18,
+#   color = "black"
+# )
+# a = list(
+#   showticklabels = TRUE,
+#   tickfont = f2)
+
 for(i in genes){
   Immuno = change[change$gene.names %in% ImGenes[[i]],]
-  Immuno = Immuno[,c(1,4,6)]
+  Immuno = Immuno[,c(1,2,4,5,6)]
   Immuno$gene.names = as.factor(as.character(Immuno$gene.names))
-  long_Imm = melt(Immuno, id.vars = "gene.names")
-  #print(ggplot(long_Imm,aes(x = variable, y = value, group = gene.names, color = gene.names)) + geom_line() + theme_bw())
-  p <- plot_ly(long_Imm, x = ~variable, y = ~value, color = ~gene.names, text = ~gene.names) %>%
-    add_lines() %>% add_annotations(long_Imm$gene.names) %>% layout(showlegend = FALSE)  
-  print(p) 
+  print(Immuno)
+  # long_Imm = melt(Immuno, id.vars = "gene.names")
+  # colnames(long_Imm) = c("gene.names","stage","gene.count")
+  # #print(ggplot(long_Imm,aes(x = variable, y = value, group = gene.names, color = gene.names)) + geom_line() + theme_bw())
+  # p <- plot_ly(long_Imm, x = ~stage, y = ~gene.count, color = ~gene.names, text = ~gene.names) %>%
+  #   add_lines() %>% layout(title = 'Deconvoluted macrophage-specyfic gene expression',
+  #                          showlegend = TRUE, xaxis = a)  
+  # print(p)
+  # rownames(Immuno) = Immuno$gene.names
+  # Immuno = Immuno[,-1]
+  #Immuno = t(Immuno)
+  #print(barplot(Immuno,beside = TRUE, col = c("gray81","deeppink3"),width=0.8))
+  p <- plot_ly(Immuno, x = ~gene.names, y = ~normal, type = 'bar', name = 'normal') %>%
+    add_trace(y = ~EN, name = 'EN') %>%
+    add_trace(y = ~DCIS, name = 'DCIS') %>%
+    add_trace(y = ~IDC, name = 'IDC') %>%
+    layout(yaxis = list(title = 'gene count'),xaxis = list(title = ''), 
+           barmode = 'group',margin = list(b = 50))
+  print(p)
+  
 }
 
 
@@ -246,11 +272,6 @@ fold = fold[complete.cases(fold),]
 fold = cbind(names = rownames(fold), fold)
 fold = fold[,c(1,3,5,4,2)]
 library(dplyr)
-fold = mutate(fold, DCIS_EN = log2((EN_Mono+1)/(DCIS_Mono +1)), IDC_EN = log2((EN_Mono+1)/(IDC_Mono +1)))
-fold = fold[order(fold[,5]),]
-filter = c("IFNA","IFNG") #"DHX","TRIM"
-viral_res = fold[grep(paste(filter,collapse="|"),fold[,1]),]
-rownames(viral_res) = viral_res[,1]
 viral_res = viral_res[,-1]
 heatmaply(log2(viral_res[,1:3]), dendrogram = "none", 
           scale_fill_gradient_fun = ggplot2::scale_fill_gradient2(low = "darkblue", high = "red", midpoint = 8.5),
@@ -303,12 +324,25 @@ for(i in 1: length(files)){
   sub_to_SI[[i]] = sub_to_SI[[i]][,-1]
 }
 
+# for(i in 1: length(files)){
+#   sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) - colMeans(sub_to_SI[[i]],na.rm = TRUE))
+# }
+
+
+#log2
 for(i in 1: length(files)){
-  sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) - colMeans(sub_to_SI[[i]],na.rm = TRUE))
+  sub_to_SI[[i]] = log2(sub_to_SI[[i]]+1) 
 }
+
+#gene center
 for(i in 1: length(files)){
-  sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) / apply(sub_to_SI[[i]],2,sd,na.rm = TRUE))
+  sub_to_SI[[i]] = sub_to_SI[[i]] - rowMeans(sub_to_SI[[i]],na.rm = TRUE)
 }
+
+# #/sd
+# for(i in 1: length(files)){
+#   sub_to_SI[[i]] = t(t(sub_to_SI[[i]]) / apply(sub_to_SI[[i]],2,sd,na.rm = TRUE))
+# }
 
 sI_expr = list()
 for(i in 1: length(files)){
@@ -335,14 +369,14 @@ rownames(sI_Mono) = c("LN","normal","EN","DCIS","IDC","AVL","metECE")
 plot_ly(data = sI_Mono,  x = ~dim1, y = ~dim2,  
         text = rownames(sI_Mono), type="scatter", mode="markers") %>%
   add_annotations(rownames(sI_Mono)) %>%
-  layout(title = "normalized")
+  layout(title = "log2 gene centered")
 
 names_stages = c("LN","normal","EN","DCIS","IDC","AVL","metECE")
 p = plot_ly()
 for(i in 1: length(v_list)){
   p = p %>% add_trace(data= v_list[[i]], x = ~dim1, y = ~dim2, name = names_stages[i],
                       text = rownames(v_list[[i]]), type="scatter", mode="markers") %>%
-    layout(title = "normalized")
+    layout(title = "log2 gene centered")
 }
 p
 
@@ -380,11 +414,13 @@ EN = read.table("/home/magda/Desktop/cibersortX/bulk_EN_unames.txt", sep = "\t",
 DCIS = read.table("/home/magda/Desktop/cibersortX/bulk_DCIS_unames.txt", sep = "\t", header = TRUE)
 IDC = read.table("/home/magda/Desktop/cibersortX/bulk_IDC_unames.txt", sep = "\t", header = TRUE)
 
-Im_genes = c("CD14", "CD163","HLA.DMA","HLA.DPB1","HLA.DRB1","HLA.DQB1","NFKBIA",
+Im_genes = c("CTSB","MMP9","CD14", "CD163","HLA-DMA","HLA-DPB1","HLA-DRB1","HLA-DQB1","NFKBIA",
              "TNFSF12","TNFRSF1A","TRADD","CD80","APOE", "CSF1R","CD47","TGFB2","MYD88","TLR3","IFNAR1","IFNAR2","IFNGR1","IFNGR2","STAT1")
 
+Im_genes = c("CD14", "CD163","HLA-DMA","HLA-DPB1","HLA-DRB1","HLA-DQB1","NFKBIA","IFNGR1","IFNGR2")
 stages = list(normal,EN,DCIS,IDC)
 names(stages) = c("normal","EN","DCIS","IDC")
+
 for(i in 1:length(stages)){
   rownames(stages[[i]])= stages[[i]][,1]
   stages[[i]]= stages[[i]][rownames(stages[[i]]) %in% Im_genes,-1]
@@ -392,15 +428,15 @@ for(i in 1:length(stages)){
 
 gene_names = rownames(stages[[1]])
 
-res = data.frame(gene=c(),stage=c(),value=c())
-for(i in 1:length(gene_names)){
-  for(j in 1:length(stages)){
-    new.row = data.frame(gene=gene_names[i],
-                         stage=names(stages)[j],
-                         value=t(stages[[j]])[,i])
-    res = rbind(res, new.row)
-  }
-}
+# res = data.frame(gene=c(),stage=c(),value=c())
+# for(i in 1:length(gene_names)){
+#   for(j in 1:length(stages)){
+#     new.row = data.frame(gene=gene_names[i],
+#                          stage=names(stages)[j],
+#                          value=t(stages[[j]])[,i])
+#     res = rbind(res, new.row)
+#   }
+# }
 
 res2 = data.frame()
 for(i in 1:length(stages)){
@@ -411,7 +447,31 @@ for(i in 1:length(stages)){
 
 library(ggplot2)
 library(ggpubr)
-for(i in colnames(res2)[1:18]){
-  print(ggboxplot(res2, x = "stage", y= i, color = "stage", add = "jitter", outlier.colour = NA))
+genes = colnames(res2)[1:9]
+for(gene in genes){
+  pvalues = t.test(res2[[gene]] ~ res2$stage, res2)$p.value
+  formatedp = format.pval(pvalues,digits = 2)
+  lbl = paste0("Welch's t-test\n p = ",formatedp,sep=" ")
+  print(ggboxplot(res2, x = "stage", y= gene, color = "stage", palette = "jco",
+                  add = "jitter", outlier.colour = NA)+
+    theme(panel.grid.major = element_blank(), legend.position = "none", axis.text=element_text(size=12),
+          panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"), 
+          plot.title = element_text(hjust = 0.5))+
+    annotate("text", x = 1.5, y = max(res2[[gene]]), label = lbl, parse = FALSE, size = 6) +
+    theme(axis.text=element_text(size=18),
+          axis.title=element_text(size=16,face="bold")))
 }
 
+# for(gene in genes){
+#   print(ggboxplot(res2, x = "stage", y = gene,
+#                  color = "stage",
+#                  add = "jitter"))
+# }
+
+for(gene in genes){
+  p = ggboxplot(res2, x = "stage", y = gene,
+                  color = "stage",palette =c("dodgerblue3","orange","chartreuse4","red"),
+                  add = "jitter")
+  my_comparisons <- list( c("normal", "EN"), c("EN", "DCIS"), c("DCIS","IDC"),c("normal", "IDC") )
+  print(p + stat_compare_means(comparisons = my_comparisons))
+}
