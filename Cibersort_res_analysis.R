@@ -111,5 +111,10 @@ for(i in genes){
           scale_fill_manual(values=c("dodgerblue3","orange","chartreuse4","red")))
 }
 
-
+png('selectedv2.png',width = 1200, height = 1200, res = 120)
+print(ggplot(long_Imm,aes(gene.names,gene.count, group = stage, fill =stage)) + 
+        geom_col(position = "dodge")+ theme_classic()+
+        theme(text = element_text(size=25))+
+        scale_fill_manual(values=c("dodgerblue3","orange","chartreuse4","red")))
+dev.off()
 
