@@ -15,7 +15,7 @@ for(j in c("DCIS", "EN", "IDC", "AVL", "LN", "ECE", "normal")){
     if(ncol(cols) != 0){
       results[[j]] = cbind(results[[j]],cols)
     }
-    print(paste(j,files[i],ncol(cols)))
+    print(paste(j,files[i],ncol(cols), colnames(cols)))
   }
   results[[j]] = data.frame(GeneNames = gene.names, results[[j]])
   print(ncol(results[[j]]))
