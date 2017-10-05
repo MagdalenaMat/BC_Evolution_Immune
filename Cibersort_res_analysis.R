@@ -88,6 +88,9 @@ to_reshape = to_reshape[,c(1,8,6,4,3,5,2,7)]
 change = mutate(to_reshape, EN_DCIS = log2(to_reshape$DCIS/to_reshape$EN), 
                 DCIS_IDC = log2(to_reshape$IDC/to_reshape$DCIS),
                 EN_IDC = log2(to_reshape$IDC/to_reshape$EN))
+change$gene.names = sub("HLA.","HLA-", change$gene.names) 
+change$gene.names = sub("NKX2.","NKX2-", change$gene.names) 
+change$gene.names = sub("WT1.","WT1-", change$gene.names)
 
 ImGenes = list()
 ImGenes[["HLA"]] = c("HLA.DMA","HLA.DPB1","HLA.DRB1","HLA.DQB1")
@@ -163,7 +166,7 @@ library(ggplot2)
 
 boot.immuno = read.table("/home/magda/Desktop/bootstrap100x_plots/long_res_boot_100_ImGenes.txt", sep = "\t", header = TRUE, row.names = 1)
 boot.immuno = boot.immuno[boot.immuno$stage %in% c("EN","DCIS","IDC"),]
-boot.immuno = boot.immuno[,colnames(boot.immuno) %in% c("CD14","CD163","NFKBIA","stage")]
+boot.immuno = boot.immuno[,colnames(boot.immuno) %in% c("CD14","CD163","NFKBIA","PYCARD","IL10RA","stage")]
 long_Bimmuno = melt(boot.immuno, id.vars = "stage")
 names(long_Bimmuno) = c("stage","gene.name","expression")
 
