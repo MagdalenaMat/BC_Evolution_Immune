@@ -3,7 +3,21 @@
 path = "/home/magda/Desktop/breast_cancer_progression/data"
 setwd(path)
 files <- list.files(path=path)
+
+#check if gene names are sme and in the same order in all files  
+names = list()
+for(i in 1:length(files)){
+  print(i)
+  namb = as.character(read.csv(files[i])[,2])
+  names[[i]] = namb
+}
+for(i in 1:(length(names)-1) ){
+  print(all(names[[i]][1] == names[[c(i+1)]][1]))
+}
+
+
 gene.names = as.character(read.csv(files[1])[,1])
+
 names <- data.frame(matrix(gene.names,58037,1))
 dim(names)
 
@@ -11,7 +25,7 @@ results = list()
 for(j in c("DCIS", "EN", "IDC", "AVL", "LN", "ECE", "normal")){
   for (i in 1: length(files)){
     r = read.csv(files[i])
-    cols = as.matrix(r[,grepl(j,colnames(r))])
+    cols = as.matrix(r[,grepl(j,colnames(r)), drop = FALSE])
     if(ncol(cols) != 0){
       results[[j]] = cbind(results[[j]],cols)
     }
@@ -28,6 +42,12 @@ results[["met_ECE"]] = ECE[,c(1,grep("et",colnames(ECE)))]
 
 #delete scDCIS
 results[["DCIS"]] = results[["DCIS"]][,c(1:120,124:129)]
+
+design = as.character()
+for(name in names(results)){
+  design = c(design, rep(name,ncol(results[[name]])-1))
+}
+
 
 # calculate TPM
 TPM = list()
@@ -61,3 +81,5 @@ for(i in c("DCIS", "EN", "IDC", "AVL", "LN", "ECE", "normal", "met_ECE")){
 
 }
 lengths(results)
+
+

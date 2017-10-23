@@ -93,6 +93,8 @@ change$gene.names = sub("NKX2.","NKX2-", change$gene.names)
 change$gene.names = sub("WT1.","WT1-", change$gene.names)
 
 ImGenes = list()
+ImGenes[["TLR_NFkB"]] = c("TLR3","TLR4","TLR1","TLR6","IL10RA","IL12A", "CYLD", "NFKBIA","NFKBIE", "MYD88")
+ImGenes[["NLRs"]] = c("CASP1","PYCARD","GSDMD", "TLR3", "TLR4", "DHX9")
 ImGenes[["HLA"]] = c("HLA.DMA","HLA.DPB1","HLA.DRB1","HLA.DQB1")
 ImGenes[["TNF"]] = c("TNFSF12","TNFRSF1A","TRADD")
 ImGenes[["NFkB"]] = c("NFKBIA","MYD88")
@@ -100,7 +102,7 @@ ImGenes[["B2M"]] = c("B2M")
 ImGenes[["CD"]] = c("CD14","CD163")
 ImGenes[["IFN"]] = c("IFNGR1","IFNGR2","NFKBIA")
 ImGenes[["selected"]] = c("CD14", "CD163","NFKBIA")
-genes = c("CD","HLA","IFN","TNF","NFkB", "B2M","selected")  
+genes = c("TLR_NFkB","NLRs","CD","HLA","IFN","TNF","NFkB", "B2M","selected")  
 #genes = c("CD", "HLA","IFN", "selected")
 
 for(i in genes){
@@ -197,3 +199,18 @@ p + scale_fill_brewer(palette="Paired") +
                          plot.title = element_text(hjust = 0.5), 
                          axis.title=element_text(size=22,face="bold"), 
                          legend.text = element_text(size=20), legend.title = element_text(size = 20)) 
+
+
+#####################boxplots
+library(ggpubr)
+boot.immuno$stage = factor(boot.immuno$stage, levels = c("EN","DCIS","IDC"))
+gnames = c("CD14","CD163","NFKBIA","PYCARD","IL10RA")
+for(gene in gnames){
+  p = ggboxplot(boot.immuno, x = "stage", y = gene,outlier.colour = NA,
+                color = "stage",palette =c("dodgerblue3","orange","chartreuse4","red"))+
+    geom_jitter(position=position_jitter(width=.2, height=0),size = 1) +
+    theme(panel.grid.major = element_blank(), legend.position = "none")
+  my_comparisons <- list( c("EN", "DCIS"), c("DCIS","IDC"),c("EN", "IDC"))
+  print(p + stat_compare_means(comparisons = my_comparisons, size = 1))
+}
+

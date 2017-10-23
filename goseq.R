@@ -1,8 +1,8 @@
 ###goseq
 to_goseq = list()
-for(nm in tail(names(change),3)){
-  to_goseq[[paste0("DE_",nm,"_up")]] = as.character(change[!is.na(change[[nm]]), 1])
-  to_goseq[[paste0("DE_",nm,"_down")]] = as.character(change[!is.na(change[[nm]]), 1])
+for(nm in tail(names(change),11)){
+  to_goseq[[paste0("DE_",nm,"_up")]] = as.character(change[change[[nm]] >= 0.5, 1])
+  to_goseq[[paste0("DE_",nm,"_down")]] = as.character(change[change[[nm]] <= -0.5, 1])
 }
 
 to_goseq_char = list()
